@@ -1,44 +1,47 @@
 from fastapi import FastAPI
 import uvicorn
-import asyncio
-import time
+from pydantic import BaseModel, EmailStr, field_validator
+from datetime import date
+import json
+import re
+import os
+from uuid import uuid4
+
 
 app = FastAPI()
 
-async def calculate_square(num: int, delay: float):
-    start_time = time.time()
-    await asyncio.sleep(delay)
-    square = num*num
-    end_time = time.time() - start_time
+class UserData(BaseModel):
+    surname: str
+    name: str
+    birth_date: date
+    phone: str
+    email: EmailStr
+
+    @field_validator('surname', 'name')
+    def validate_cyrillic(cls, v):
+        if not re.match(r'^[А-Я][а-я]+$', v):
+            raise ValueError('Должно содержать только кириллицу и заглавную первую букву')
+        return v
+
+    @field_validator('phone')
+    def validate_phone(cls, v):
+        phone = re.sub(r'[\s\-\(\)]', '', v)
+        if not re.match(r'^\+?7\d{10}$|^8\d{10}$', phone):
+            raise ValueError('Неверный формат телефона')
+        return v
+
+@app.post("/save_user")
+async def save_user(user: UserData):
+    os.makedirs("data", exist_ok=True)
+    filename = f"data/user_{uuid4()}.json"
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(user.model_dump(), f, ensure_ascii=False, indent=2, default=str)
+    
     return {
-        "number": num,
-        "square": square,
-        "delay": delay,
-        "time": round(end_time, 2)
+        "status": "success",
+        "filename": filename
     }
-
-@app.post('/calculate/')
-async def calculate(request: dict):
-    numbers = request.get("numbers", [])
-    delays = request.get("delays", [])
-
-    start_time = time.time()
-
-    tasks = []
-    for num, delay in zip(numbers, delays):
-        task = calculate_square(num, delay)
-        tasks.append(task)
-
-    result = await asyncio.gather(*tasks)
-
-    total_time = time.time() - start_time
-    sequential_time = sum(delays)
-
-    return {
-            "results": result,
-            "total_time": round(total_time, 2),
-            "parallel_faster_than_sequential": total_time < sequential_time
-        }
     
 
 if __name__ == '__main__':

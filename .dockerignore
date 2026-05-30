@@ -1,0 +1,9 @@
+env/
+__pycache__/
+tests/
+.pytest_cache/
+.git/
+.gitignore
+.vscode/
+.env
+README.md

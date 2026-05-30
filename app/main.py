@@ -1,19 +1,26 @@
-from fastapi import FastAPI, Depends
-from app.routers import students, auth
-from app.database import engine, Base
-from app.auth import get_current_user
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.api.v1 import users, vacancies, resumes
 
-Base.metadata.create_all(bind=engine)
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+)
 
-app = FastAPI(title="Student API", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.include_router(students.router)
-app.include_router(auth.router)
+app.include_router(users.router, prefix=settings.API_V1_STR)
+app.include_router(vacancies.router, prefix=settings.API_V1_STR)
+app.include_router(resumes.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
-def root():
-    return {"message": "Welcome to Student API"}
-
-@app.get("/protected")
-def protected_route(current_user = Depends(get_current_user)):
-    return {"message": "This is protected route", "user": current_user.username}
+async def root():
+    return {"message": "HR Vacancy Service API", "version": settings.VERSION}
